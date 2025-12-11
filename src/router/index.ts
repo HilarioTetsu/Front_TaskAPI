@@ -48,9 +48,23 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore();
 
-  if (to.meta.public) return true;
+  // 1. Verificación proactiva: Si hay token pero está expirado, limpiar todo.
+  if (auth.token && auth.isTokenExpired) {
+    auth.logout();
+    return { name: 'login' };
+  }
 
-  const isLogged = auth.isAuthenticated; // ya tienes esto en tu store de auth
+  // 2. Rutas públicas
+  if (to.meta.public) {
+    // Si intenta ir a login pero ya está autenticado y válido, mandar a dashboard
+    if (auth.isAuthenticated && to.name === 'login') {
+        return { name: 'dashboard' };
+    }
+    return true;
+  }
+
+  // 3. Rutas privadas
+  const isLogged = auth.isAuthenticated; 
   if (!isLogged) {
     return { name: 'login' };
   }
