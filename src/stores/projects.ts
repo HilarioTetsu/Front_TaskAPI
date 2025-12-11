@@ -25,7 +25,9 @@ export interface Project {
 }
 
 interface ProjectsState {
-  list: Project[];
+  owned: Project[];
+  collaborations: Project[];
+
   statuses: Record<number, string>;
   loading: boolean;
   error: string | null;
@@ -39,7 +41,8 @@ interface ProjectsState {
 
 export const useProjectsStore = defineStore('projects', {
   state: (): ProjectsState => ({
-    list: [],
+    owned: [],          // Inicializar vacío
+    collaborations: [], // Inicializar vacío
     statuses: {},
     loading: false,
     error: null,
@@ -100,13 +103,19 @@ export const useProjectsStore = defineStore('projects', {
       this.loading = true;
       this.error = null;
       try {
-        const res = await api.get<Project[]>('/projects');
-        this.list = res.data;
+        const res = await api.get<{ owned: Project[], collaborations: Project[] }>('/projects');
+        
+        this.owned = res.data.owned;
+        this.collaborations = res.data.collaborations;
+
       } catch (e: any) {
+
         console.error('Error cargando /projects', e);
         this.error =
           e?.response?.data?.message ?? 'No se pudieron cargar los proyectos';
-        this.list = [];
+        this.owned = [];
+        this.collaborations = [];
+
       } finally {
         this.loading = false;
       }
