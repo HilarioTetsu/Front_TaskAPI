@@ -10,37 +10,29 @@ const props = defineProps<{
   projectId: string;
 }>();
 
-const canCreateTask = computed(() => {
-  const currentProject = project.value;
-  const myUserId = userStore.me?.id;
-
-  if (!currentProject || !myUserId) return false;
-
-  // Si soy Owner -> TRUE
-  if (currentProject.ownerId === myUserId) return true;
-
-  // Buscamos rol
-  const memberRecord = projectsStore.members.find(
-    (m: any) => Number(m.usuarioId) === Number(myUserId)
-  );
-
-  // Si soy Viewer -> FALSE, cualquier otro -> TRUE
-  if (memberRecord && memberRecord.role === 'VIEWER') return false;
-
-  return true; // Por defecto (Editor, etc)
-});
 
 const projectsStore = useProjectsStore();
 const tasksStore = useTasksStore();
 const userStore = useUserStore();
 
 const showNewTaskModal = ref(false);
+const loadingPermissions = ref(true);
 
 onMounted(async () => {
-  await tasksStore.loadCatalogs();
-  await projectsStore.getMembers(props.projectId);
-  if (!userStore.me) {
-    await userStore.loadMe();
+  try {
+
+    loadingPermissions.value = true;
+
+
+    await Promise.all([
+      tasksStore.loadCatalogs(),
+      projectsStore.getMembers(props.projectId),
+
+      !userStore.me ? userStore.loadMe() : Promise.resolve()
+    ]);
+  } finally {
+
+    loadingPermissions.value = false;
   }
 });
 
@@ -50,55 +42,42 @@ const tasks = computed(() => project.value?.listTask ?? []);
 
 
 
-// Helpers para labels
+
 const prioridadLabel = (id?: number | null) => tasksStore.prioridadLabel(id ?? undefined);
 const statusLabel = (id?: number | null) => tasksStore.statusLabel(id ?? undefined);
 
 
 function onTaskCreated() {
-  // Estrategia simple: recargar el proyecto para traer la nueva lista de tareas
+
   if (project.value) {
     projectsStore.loadOne(project.value.idGuid);
   }
   showNewTaskModal.value = false;
 }
 
-function handleNewTaskClick() {
+const canCreateTask = computed(() => {
+  // Si estamos cargando datos, NO mostrar botón (evita parpadeo)
+  if (loadingPermissions.value) return false;
+
   const currentProject = project.value;
   const myUserId = userStore.me?.id;
 
-  console.log("--- DEBUG PERMISOS ---");
-  console.log("Mi ID:", myUserId);
-  console.log("Dueño Proyecto ID:", currentProject?.ownerId);
-  console.log("Lista Miembros:", projectsStore.members);
+  if (!currentProject || !myUserId) return false;
 
-  if (!currentProject || !myUserId) {
-    console.warn("Faltan datos de proyecto o usuario, abriendo modal por defecto...");
-    showNewTaskModal.value = true;
-    return;
-  }
+  // A) Si soy OWNER -> TRUE
+  if (currentProject.ownerId === myUserId) return true;
 
-  // A) Si soy el OWNER del proyecto, pase directo
-  if (currentProject.ownerId === myUserId) {
-    console.log("Soy OWNER -> Acceso concedido");
-    showNewTaskModal.value = true;
-    return;
-  }
-
-  // B) Si soy MIEMBRO, busco mi rol
-  // Nota: Aseguramos que la comparación sea segura (Number vs Number)
+  // B) Buscamos rol en la lista ya cargada
   const memberRecord = projectsStore.members.find((m: any) => Number(m.usuarioId) === Number(myUserId));
-  console.log("Registro de miembro encontrado:", memberRecord);
 
-  // Si me encontraron y soy VIEWER -> BLOQUEAR
-  if (memberRecord && memberRecord.role === 'VIEWER') {
-    console.log("Rol es VIEWER -> Acceso denegado");
-    window.alert("⛔ ACCESO DENEGADO\n\nTu rol de 'VIEWER' no te permite crear tareas en este proyecto.");
-    return; // <--- Importante: Aquí se detiene y NO abre el modal
-  }
+  // C) Si soy VIEWER -> FALSE
+  if (memberRecord && memberRecord.role === 'VIEWER') return false;
 
-  // C) Si soy EDITOR (o cualquier otro caso), abrir
-  console.log("Soy EDITOR o no encontrado -> Acceso concedido");
+  // D) Cualquier otro caso (Editor, Admin, etc) -> TRUE
+  return true;
+});
+
+function handleNewTaskClick() {
   showNewTaskModal.value = true;
 }
 
@@ -112,10 +91,9 @@ function handleNewTaskClick() {
       <h2 class="text-lg font-semibold text-slate-900">
         Tareas del proyecto
       </h2>
-
-      <button v-if="canCreateTask"
-        class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
-        @click="showNewTaskModal = true">
+      <button v-if="canCreateTask" type="button"
+        class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition shadow-sm"
+        @click="handleNewTaskClick">
         Nueva tarea
       </button>
 

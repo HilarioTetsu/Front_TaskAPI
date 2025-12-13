@@ -1,17 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useAuthStore } from '../../stores/auth';
+import { useUserStore } from '../../stores/user';
 import { useRouter } from 'vue-router';
 
 const auth = useAuthStore();
 const router = useRouter();
+const userStore = useUserStore();
 
 const identifier = ref('');
 const password = ref('');
 
 async function login() {
   await auth.login(identifier.value, password.value);
+  
   if (auth.token) {
+    await userStore.loadMe(); 
+    
     router.push('/');
   }
 }
