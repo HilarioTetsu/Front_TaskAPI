@@ -17,11 +17,8 @@ const projectId = computed(() => String(route.params.projectId));
 const isOwner = computed(() => {
   if (!store.current) return false;
 
-  // intenta varias propiedades comunes que solemos usar
-  const currentUserId =
-    (userStore as any).currentUser?.id ??
-    (userStore as any).user?.id ??
-    null;
+  // CORRECCIÓN: Accedemos correctamente a 'userStore.me'
+  const currentUserId = userStore.me?.id; 
 
   if (currentUserId == null) return false;
 

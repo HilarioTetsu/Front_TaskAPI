@@ -50,10 +50,11 @@ async function searchUsers() {
 
   searchingUsers.value = true;
   try {
+    
     const res = await api.get<SearchUser[]>('/usuario/search', {
       params: {
         term: searchTerm.value,
-        projectId: props.projectId,
+        projectId: props.projectId, 
       },
     });
 
